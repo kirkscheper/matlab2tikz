@@ -2690,6 +2690,72 @@ function [m2t, str] = drawFilledContours(m2t, h, contours, istart, nrows)
     % the contours will have to be plotted in reverse order, i.e. from
     % highest (largest) to lowest (narrowest).
 
+    % Add zero level fill
+    borderleft = [min(min(get(h,'XData'))) min(min(get(h,'YData')));...
+                  min(min(get(h,'XData'))) max(max(get(h,'YData')))];
+    borderright = [max(max(get(h,'XData'))) min(min(get(h,'YData')));...
+                   max(max(get(h,'XData'))) max(max(get(h,'YData')))];
+    bordertop = [min(min(get(h,'XData'))) max(max(get(h,'YData')));...
+                   max(max(get(h,'XData'))) max(max(get(h,'YData')))];
+    borderbottom = [min(min(get(h,'XData'))) min(min(get(h,'YData')));...
+                   max(max(get(h,'XData'))) min(min(get(h,'YData')))];
+               
+    for ii = 1:numel(cellcont)
+        [in,begin_left] = inpolygon(cellcont{ii}(2,1), cellcont{ii}(2,2),...
+            borderleft(:,1), borderleft(:,2));
+        [in,end_left] = inpolygon(cellcont{ii}(end,1), cellcont{ii}(end,2),...
+            borderleft(:,1), borderleft(:,2));
+        [in,begin_right] = inpolygon(cellcont{ii}(2,1), cellcont{ii}(2,2),...
+            borderright(:,1), borderright(:,2));
+        [in,end_right] = inpolygon(cellcont{ii}(end,1), cellcont{ii}(end,2),...
+            borderright(:,1), borderright(:,2));
+        [in,begin_top] = inpolygon(cellcont{ii}(2,1), cellcont{ii}(2,2),...
+            bordertop(:,1), bordertop(:,2));
+        [in,end_top] = inpolygon(cellcont{ii}(end,1), cellcont{ii}(end,2),...
+            bordertop(:,1), bordertop(:,2));
+        [in,begin_bottom] = inpolygon(cellcont{ii}(2,1), cellcont{ii}(2,2),...
+            borderbottom(:,1), borderbottom(:,2));
+        [in,end_bottom] = inpolygon(cellcont{ii}(end,1), cellcont{ii}(end,2),...
+            borderbottom(:,1), borderbottom(:,2));
+        
+        % if start and end on same edge do nothing
+        if (begin_left && end_left) || (begin_right && end_right) ||...
+                (begin_top && end_top) || (begin_bottom && end_bottom)
+            continue;
+        end
+        
+        % check if encloses a corner
+        if (begin_left && end_top) || (begin_top && end_left)
+            cellcont{ii} = [cellcont{ii}(1,:); borderleft(2,:); cellcont{ii}(2:end,:)];
+        elseif (begin_right && end_top) || (begin_top && end_right)
+            cellcont{ii} = [cellcont{ii}(1,:); borderright(2,:); cellcont{ii}(2:end,:)];
+        elseif (begin_left && end_bottom) || (begin_bottom && end_left)
+            cellcont{ii} = [cellcont{ii}(1,:); borderleft(1,:); cellcont{ii}(2:end,:)];
+        elseif (begin_right && end_bottom) || (begin_bottom && end_right)
+            cellcont{ii} = [cellcont{ii}(1,:); borderright(1,:); cellcont{ii}(2:end,:)];
+        else
+            if begin_left
+                cellcont{ii} = [cellcont{ii}(1,:); borderleft(2,:); cellcont{ii}(2:end,:)];
+            elseif begin_right
+                cellcont{ii} = [cellcont{ii}(1,:); borderright(1,:); cellcont{ii}(2:end,:)];
+            elseif begin_top
+                cellcont{ii} = [cellcont{ii}(1,:); bordertop(1,:); cellcont{ii}(2:end,:)];
+            elseif begin_bottom
+                cellcont{ii} = [cellcont{ii}(1,:); borderbottom(1,:); cellcont{ii}(2:end,:)];
+            end
+
+            if end_left
+                cellcont{ii} = [cellcont{ii}; borderleft(1,:)];
+            elseif end_right
+                cellcont{ii} = [cellcont{ii}; borderright(2,:)];
+            elseif end_top
+                cellcont{ii} = [cellcont{ii}; bordertop(1,:);];
+            elseif end_bottom
+                cellcont{ii} = [cellcont{ii}; borderbottom(1,:);];
+            end
+        end
+    end
+    
     %FIXME: close the contours over the border of the domain, see #723.
     order = NaN(ncont,1);
     ifree = true(ncont,1);
@@ -2706,6 +2772,7 @@ function [m2t, str] = drawFilledContours(m2t, h, contours, istart, nrows)
             if ~ifree(ii), continue, end
 
             curr = cellcont{ii};
+
             % Current contour contained in the peer
             if inpolygon(curr(2,1),curr(2,2), peer(2:end,1),peer(2:end,2))
                 igroup(ii) = true;
@@ -2728,7 +2795,7 @@ function [m2t, str] = drawFilledContours(m2t, h, contours, istart, nrows)
         from  = from + nmembers;
         ifree = ifree & ~igroup;
     end
-
+    
     % Reorder the contours
     cellcont(order,1) = cellcont;
 
@@ -2737,11 +2804,19 @@ function [m2t, str] = drawFilledContours(m2t, h, contours, istart, nrows)
     ydata = get(h,'YData');
     %FIXME: determine the contour at the zero level not just its bounding box
     % See also: #721
-    zerolevel = [0,          4;
+    zerolevel = [cellcont{1}(1,1),          4;
         min(xdata(:)), min(ydata(:));
         min(xdata(:)), max(ydata(:));
         max(xdata(:)), max(ydata(:));
         max(xdata(:)), min(ydata(:))];
+    
+    offset = cellcont{order(1)}(1,1);
+    for ii = 1:size(cellcont,1)
+        if cellcont{ii}(1,1) <= zerolevel(1,1)
+        cellcont{ii}(1,1) = cellcont{ii}(1,1) - offset;
+        end
+    end
+    
     cellcont = [zerolevel; cellcont];
 
     % Plot

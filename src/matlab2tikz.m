@@ -1,4 +1,5 @@
 function matlab2tikz(varargin)
+	warning('off', 'MATLAB:inpolygon:ModelingWorldLower')
     %MATLAB2TIKZ    Save figure in native LaTeX (TikZ/Pgfplots).
     %   MATLAB2TIKZ() saves the current figure as LaTeX file.
     %   MATLAB2TIKZ comes with several options that can be combined at will.
